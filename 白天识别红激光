@@ -1,0 +1,117 @@
+
+import sensor, image, time
+from pyb import UART
+import json
+
+#threshold = [(44, 57, 73, 45, -29, 34)]
+#threshold = [ (98, 100, -5, 4, -3, 4) ]  #白板上
+
+#threshold = [(33, 51, 77, 52, -12, 32)]   #调式
+threshold = [ (56, 16, 26, 72, 40, -2) ]  #胶布上
+sensor.set_auto_exposure(False,50)
+
+
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QVGA)
+#sensor.skip_frames(time = 2000 )
+sensor.set_auto_gain(False) # must be turned off for color tracking
+#sensor.set_auto_whitebal(False) # must be turned off for color tracking
+#sensor.set_auto_exposure(False)
+sensor.set_vflip(True)#垂直方向翻转
+sensor.set_hmirror(True)#水平翻转
+sensor.skip_frames(20) # Let new settings take affect.
+
+sensor.set_auto_exposure(False,7000)  #白天情况下
+#sensor.set_auto_exposure(False,90)    #4号晚上
+sensor.set_auto_whitebal(False) # turn this off.
+
+
+clock = time.clock()
+
+
+#对list进行拓展，高位补0
+def Expand_String(a):
+    while(len(a)<4):
+        if(a[0]=='-'):
+             a.insert(1,'0')
+        else:
+             a.insert(0,'0')
+    return a
+
+uart = UART(3, 115200)
+
+uart.init(115200, bits=8, parity=None, stop=1)  #8位数据位，无校验位，1位停止位、
+
+while(True):
+    clock.tick()
+    img = sensor.snapshot()
+    blob = img.find_blobs(threshold, area_threshold=100)
+    if blob: #如果找到了目标颜色=
+        FH = bytearray([0xb3,0xb4])
+        #uart.write(FH)
+        for b in blob:
+        #迭代找到的目标颜色区域
+            img.draw_cross(b[5], b[6]) # cx, cy
+            img.draw_edges(b.min_corners(), color=(0,255,0))
+            x = b.cx()
+            y = b.cy()
+
+            print(x)
+            print(y)
+
+            x=x-160
+            y=120-y
+
+
+             #把整型转化为list
+            a1_x=list(json.dumps(x))
+            a1_y=list(json.dumps(y))
+
+            #print(a1_x[0])
+
+            #对list中的每一个元素都进行补位
+            Expand_String(a1_x)
+            Expand_String(a1_y)
+
+            #a_x=a1_x[0]
+            #a1_x=a1_x-160
+            #a1_y=a1_y-120
+
+            #print(a1_x)
+            #print(a1_y)
+
+            #转化为字符串
+            a1_x=''.join(a1_x)
+            a1_y=''.join(a1_y)
+
+            uart.write('ff')
+            uart.write(a1_x)
+            uart.write(a1_y)
+            uart.write('ee')
+
+            print(a1_x,a1_y)
+    else:
+      print('not')
+
+
+            #output_str="%d,%d" % (b.cx(),b.cy())
+
+            #print(output_str)
+            #print(type(output_str))
+
+            #uart.write(output_str)
+
+            #print(x,y)
+            #print(xy_str)
+            #data = bytearray([x,y])
+            #uart.write(data)
+            #print(data)
+
+            #end = bytearray([0x01,0x01,0xb5,0xb6])
+            #uart.write(end)
+            #print(type(end))
+            #print(end)
+
+
+
